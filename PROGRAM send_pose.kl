@@ -1,0 +1,55 @@
+PROGRAM send_pose
+%STACKSIZE = 4000
+%NOLOCKGROUP
+%ENVIRONMENT uif
+%ENVIRONMENT sysdef
+%INCLUDE klevccdf
+
+VAR
+  file_var : FILE
+  status   : INTEGER
+  cur_pos  : XYZWPR
+  str_send : STRING[128]
+  loop_flag: BOOLEAN
+
+BEGIN
+  -- Initialisierung
+  loop_flag = TRUE
+  
+  -- Konfiguration der Datei für den Server Tag S3
+  -- ATR_IA bedeutet "Interactive ASCII" (gut für Text-Daten)
+  SET_FILE_ATR(file_var, ATR_IA)
+  
+  -- Verbindung herstellen (Wartet, bis Ihr PC sich verbindet!)
+  WRITE('Warte auf Verbindung...', CR)
+  -- 'S3:' muss mit Ihrem Setup in Host Comm übereinstimmen
+  MSG_CONNECT('S3:', status)
+  
+  IF status = 0 THEN
+    WRITE('Verbindung hergestellt!', CR)
+    
+    -- Datei zum Schreiben öffnen
+    OPEN FILE file_var('RW', 'S3:')
+    
+    WHILE loop_flag = TRUE DO
+      -- 1. Aktuelle Position holen (0 = Current Group)
+      cur_pos = CURPOS(0, 0)
+      
+      -- 2. Daten formatieren (CSV Format: X,Y,Z,W,P,R)
+      -- Hier können Sie auch Zeitstempel hinzufügen, falls nötig
+      WRITE file_var(cur_pos.x::9::3, ',', cur_pos.y::9::3, ',', cur_pos.z::9::3, CR)
+      
+      -- WICHTIG: Kurze Pause, um die CPU nicht zu überlasten
+      -- 8ms - 16ms ist oft ein guter Takt für Roboter-Loops
+      DELAY 16
+      
+      -- Abbruchbedingung prüfen (z.B. über ein Register oder Input)
+      -- IF DIN[1] = ON THEN loop_flag = FALSE ENDIF
+    ENDWHILE
+    
+    CLOSE FILE file_var
+    MSG_DISCO('S3:', status)
+  ELSE
+    WRITE('Verbindungsfehler: ', status, CR)
+  ENDIF
+END send_pose
